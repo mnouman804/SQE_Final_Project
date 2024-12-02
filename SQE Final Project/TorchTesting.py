@@ -2,6 +2,7 @@ import requests
 import torch
 from PIL import Image, UnidentifiedImageError
 from transformers import BlipProcessor, BlipForConditionalGeneration
+import time
 import torch.testing as tt
 
 processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-large")
@@ -36,5 +37,22 @@ def test_image_captioning():
         tt.assert_close(len(caption) > 0, True, msg=f"Caption empty for {url}")
 
 
+# Performance test 
+def test_inference_time():
+    image = load_image('https://storage.googleapis.com/sfr-vision-language-research/BLIP/demo.jpg')
+    inputs = processor(image, return_tensors="pt")
+
+    start_time = time.time()
+    with torch.no_grad():
+        model.generate(**inputs)
+    end_time = time.time()
+
+    inference_time = (end_time - start_time) * 1000  # Convert to milliseconds
+    print(f"Start time: {start_time:.2f} ms")
+    print(f"End Time: {end_time:.2f} ms")
+    print(f"Inference time: {inference_time:.2f} ms")
+
+
 # Run tests
 test_image_captioning()
+test_inference_time()
