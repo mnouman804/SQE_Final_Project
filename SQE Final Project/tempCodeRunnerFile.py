@@ -1,0 +1,1 @@
+suite_result.save_as_html('deepchecks_advanced_report.html')

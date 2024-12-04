@@ -1,38 +1,59 @@
+import requests
 from PIL import Image
+import pandas as pd
 from transformers import BlipProcessor, BlipForConditionalGeneration
-import deepchecks as dc
+from deepchecks.tabular.suites import data_integrity  # Correct import path for DataIntegrity check
+from deepchecks.tabular import Dataset
 
-# Initialize the processor and model
+# Load the BLIP model
 processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-large")
 model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-large")
 
-# Path to your local image
-image_path = '/Users/user/Pictures/Personal Pictures/result_sr.png'  # Update with the correct path
-raw_image = Image.open(image_path).convert('RGB')
+# Fetch and prepare the image
+img_url = 'https://storage.googleapis.com/sfr-vision-language-research/BLIP/demo.jpg'  # Image URL
+raw_image = Image.open(requests.get(img_url, stream=True).raw).convert('RGB')
 
-# Prepare the inputs for the model
-text = "a photograph of"
+# Conditional image captioning
+text = "a photography of"
 inputs = processor(raw_image, text, return_tensors="pt")
-inputs_unconditional = processor(raw_image, return_tensors="pt")
+out = model.generate(**inputs)
+caption_conditional = processor.decode(out[0], skip_special_tokens=True)
 
-# Generate captions
-out_conditional = model.generate(**inputs)
-out_unconditional = model.generate(**inputs_unconditional)
+# Unconditional image captioning
+inputs = processor(raw_image, return_tensors="pt")
+out = model.generate(**inputs)
+caption_unconditional = processor.decode(out[0], skip_special_tokens=True)
 
-# Decode the output to text
-caption_conditional = processor.decode(out_conditional[0], skip_special_tokens=True)
-caption_unconditional = processor.decode(out_unconditional[0], skip_special_tokens=True)
+# Display the results
+print("Conditional Caption: ", caption_conditional)
+print("Unconditional Caption: ", caption_unconditional)
 
-# Custom check for image captioning
-def captioning_test():
-    assert len(caption_conditional) > 10, f"Conditional caption is too short: {caption_conditional}"
-    assert len(caption_unconditional) > 10, f"Unconditional caption is too short: {caption_unconditional}"
-    assert isinstance(caption_conditional, str) and caption_conditional.strip() != "", "Conditional caption should be a non-empty string"
-    assert isinstance(caption_unconditional, str) and caption_unconditional.strip() != "", "Unconditional caption should be a non-empty string"
+# Prepare data for Deepchecks
+test_data = {
+    'image_url': [img_url],  # Image URL
+    'conditional_caption': [caption_conditional],
+    'unconditional_caption': [caption_unconditional]
+}
 
-# Run the test
-captioning_test()
+# Convert the dictionary to a pandas DataFrame
+df = pd.DataFrame(test_data)
 
-# Print the results
-print(f"Conditional Caption: {caption_conditional}")
-print(f"Unconditional Caption: {caption_unconditional}")
+# Create the Deepchecks dataset
+dataset = Dataset(df)
+
+# Perform data integrity check using Deepchecks
+check_result = data_integrity().run(dataset)  # Run data integrity check
+
+# Show results of the data integrity check
+check_result.show()
+check_result.save_as_html('deepchecks_advanced_reporter.html')
+
+
+
+#Deepchecks Testing in This Code:
+#Test Type: Data Integrity Testing
+#The Deepchecks suite (data_integrity) checks the quality and consistency of the data in the provided DataFrame. The checks could include:
+#Missing Values: Checking if any columns have missing or null values.
+##Data Types: Ensuring that all columns have consistent data types.
+#Duplicates: Detecting duplicate rows in the dataset.
+#Constant Features: Identifying any columns that have the same value across all rows, which can indicate redundancy.
